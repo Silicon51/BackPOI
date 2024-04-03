@@ -4,8 +4,8 @@ config_file="$(dirname "$0")/bckp_conf.txt"
 log_file="/var/log/backpoi/bckp_logfile.log"
 self_path="$(dirname "$0")/$(basename "$0")"
 exec 3>&1
-exec > >(tee -a "$log_file") 2>&1  # Redirect both stdout and stderr to the log file
-source "$config_file"
+exec > >(tee -a "$log_file") 2>&1   # Redirect both stdout and stderr to the log file
+source "$config_file"               # Read configuration file 
 # Declare some variables
 today=$(date +%s)
 now=$(date +%Y-%m-%d_%H-%M-%S)
