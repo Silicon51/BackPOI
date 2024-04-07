@@ -35,7 +35,6 @@ log_message() {
         echo -e  "[DEBUG]\t$timestamp - $message" >> "$log_file"
     fi
 }
-
 echo_console() {
     echo -e "$1" >&3
 }
@@ -60,11 +59,27 @@ welcome() {
     help
 }
 error() {
-    echo_console ""&& echo_console ""&& echo_console "Wrong syntax!"&& echo_console ""&& echo_console "Run 'backpoi --help' for more information"
+    echo_console ""&& echo_console "Wrong syntax!"&& echo_console ""&& echo_console "Run 'backpoi --help' for more information"
     exit 1
 }
 edit_conf() {
     nano $config_file >&3
+    exit 0
+}
+log_level_update() {
+    check_conf_file
+    if [ -z "$1" ]; then
+        echo_console "Log Level is set to $log_level"
+        echo_console "1 - ERROR"
+        echo_console "2 - INFO"
+        echo_console "3 - DEBUG"
+        exit 0
+    fi
+    if [ "$1" -ne 1 ] && [ "$1" -ne 2 ] && [ "$1" -ne 3 ] ; then
+        error
+        exit 1
+    fi
+    sed -i "s/\(log_level=\).*/\1$1/" "$config_file"
     exit 0
 }
 logs() {
@@ -72,6 +87,7 @@ logs() {
     exit 0
 }
 backup() {
+    # Copy all files to choosen directory
     jnt=1
     if ! [ -z "$1" ]; then # If an argument to function was given then it's run by manual backup
         local destination=$1
@@ -143,14 +159,17 @@ manual() {
     fi
     log_message "$INFO" "Manual backup was called to $1"
     
-
     destination=$1"/"$now
+    check_folder_existance $destination
+    backup $destination
+    config_backup $destination
+}
+check_folder_existance() {
+    local $destination=$1
     if ! [ -e "$destination" ]; then
         log_message "$DEBUG" "$destination folder doesn't exist"
         mkdir -p "$destination" &&  log_message "$INFO"  "$destination folder created"
     fi
-    backup $destination
-    config_backup $destination
 }
 periodical() {
     check_conf_file
@@ -161,41 +180,24 @@ periodical() {
     for period in "${backup_periods[@]}"; do
         days_passed=$(( (today - "d$int") / 86400 ))
         log_message "$INFO"  "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: days passed since last backup: $days_passed"
-
         # Check if days passed since last backup excide defined backup period
         if [ "$days_passed" -gt "$period" ]; then
             log_message "$INFO"  "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: backup is older than configured period=${period}days"
-
 	        for destn in "${bckp_dest[@]}"; do
                 destination="${destn}/${period}d"
-                if ! [ -e "$destination" ]; then
-                    log_message "$DEBUG" "$destination folder doesn't exist"
-                    mkdir -p "$destination" &&  log_message "$INFO" "$destination folder created"
-                fi
-
+                check_folder_existance $destination
    		        # Purge old backup if exist
     	        if [ -z "$(ls -A "$destination")" ]; then
-	        	    rm -R "$destination"/* && log_message "$DEBUG" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: folder purged"
+	        	    rm -R "$destination"/* && log_message "$DEBUG" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: folder purged" \
+                    || log_message "$ERROR" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: folder cannot be purged"
 	            else
 		        log_message "$DEBUG" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: $destn/${period}d folder already empty"
 	            fi
-
-                # Copy all files to choosen directory
                 backup
 		        ((knt++))
 	        done
             knt=1
-
-            # Update date of last backup in configuration file, if data do not exist it will be created
-	        if grep -q "^d$int=" "$config_file"; then
-                sed -i "s/^d$int=.*/d$int=$today/" "$config_file"
-		        log_message "$DEBUG" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: date of backup updated in configuration file"
-            else
-                echo "d$int=$today" >> "$config_file"
-		        log_message "$DEBUG" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: d$int do not exist in configuration file"
-		        log_message "$DEBUG" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: d$int=$today added to configuration file"
-	        fi
-            log_message "$INFO"  "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: new backup created"
+            conf_file_update $int
         else
         log_message "$INFO"  "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: newer than assign period, nothing to be done"
         fi
@@ -207,30 +209,20 @@ periodical() {
         config_backup $destn
     done
 }
-log_level_update() {
-    check_conf_file
-    if [ -z "$1" ]; then
-        echo_console "Log Level is set to $log_level"
-        echo_console "1 - ERROR"
-        echo_console "2 - INFO"
-        echo_console "3 - DEBUG"
-        exit 0
+conf_file_update() {
+    local int=$1
+    # Update date of last backup in configuration file, if data do not exist it will be created
+    if grep -q "^d$int=" "$config_file"; then
+        sed -i "s/^d$int=.*/d$int=$today/" "$config_file" \
+        && log_message "$DEBUG" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: date of backup updated in configuration file" \
+        || log_message "$ERROR" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: date of backup not updated in configuration file. Something goes wrong"
+    else
+        log_message "$DEBUG" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: d$int do not exist in configuration file"
+        echo "d$int=$today" >> "$config_file" \
+        && log_message "$DEBUG" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: d$int=$today added to configuration file" \
+        || log_message "$ERROR" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: d$int=$today not added to configuration file Something goes wrong"
     fi
-    if [ "$1" -ne 1 ] && [ "$1" -ne 2 ] && [ "$1" -ne 3 ] ; then
-        echo_console ""
-        echo_console "Wrong value! Only Integers allowed."
-        echo_console "1 - ERROR"
-        echo_console "2 - INFO"
-        echo_console "3 - DEBUG"
-        exit 1
-    fi
-    sed -i "s/\(log_level=\).*/\1$1/" "$config_file"
-    exit 0    
-    
-    
 }
-
-
 
 case $1 in
 manual) "$@";;
