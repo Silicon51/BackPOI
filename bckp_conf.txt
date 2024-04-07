@@ -1,18 +1,30 @@
-#this part is editable by user - time period in days for each backup
+# This part is editable by user
+
+# Time in days for each backup period
+# use format b*_period, each number needs to be unique
 b1_period=1
 b2_period=7
 b3_period=30
 b4_period=180
 
-#paths for backup
+# Paths for backup
+# use format path*, each number needs to be unique
 path1="/etc/samba/smb.conf"
-path2="/home/dvm_fls"
+path2="/home/usr"
 
-#paths to backup
-dest1="/mnt/dta_drv/backup"
+# Paths of destination points
+# use format dest*, each number needs to be unique
+dest1="/mnt/dvc1/backup"
 
-#this part is managed by script do not change it manually
-d1=1711136861
-d2=1711307870
-d3=1711247094
-d4=1711247094
+
+
+# This part is managed by script do not change it manually
+
+log_level=3
+first_usage=true
+
+# date of last backup for each period if removed script will create all backup_periods
+d1=1712000000
+d2=1710000000
+d3=1700000000
+d4=1600000000

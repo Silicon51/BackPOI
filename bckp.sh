@@ -47,6 +47,7 @@ help() {
     echo_console "-m, manual\t\tStart manual backup to folder choosen in configuration file. Required parameter is path for backup"
     echo_console "-p, periodical\t\tStart periodical backup fully based on configuration file. No additional parameters needed"
     echo_console "    path\t\tPrint path of script"
+    echo_console "-s, schedule\t\tOpen Crontab"
     echo_console "" && echo_console "Example:"
     echo_console "\tbackpoi -m /mnt/device_1/backup_folder"
     echo_console "This will create new folder in choosen directory using today's date as name and then copy all files and folders indicated in configuration file there"
@@ -55,17 +56,26 @@ help() {
     exit 0
 }
 welcome() {
-    echo_console "/n/nWelcome to BackPOI - easy and simple backup script for bash console/n/n/nScript path is $self_path"
+    echo_console "\n\nWelcome to BackPOI - easy and simple backup script for bash console\n\n\nScript path is $self_path"
+    check_conf_file
+    first_usage=$(grep -oP 'first_usage=\K.*' "$config_file")
+    #if [ $first_usage=true ]; then
+    #
+    #first_usage=false
+    #sed -i "s/\(first_usage=\).*/\1$first_usage/" "$config_file"
+    #else
+    #fi
     help
 }
 path() {
     echo_console ""&& echo_console ""&& echo_console "Script path is $self_path"
 }
 error() {
-    echo_console "/nWrong syntax!/nRun 'backpoi --help' for more information"
+    echo_console "\nWrong syntax!\nRun 'backpoi --help' for more information"
     exit 1
 }
 edit_conf() {
+    check_conf_file
     nano $config_file >&3
     exit 0
 }
@@ -78,12 +88,16 @@ log_level_update() {
         echo_console "3 - DEBUG"
         exit 0
     fi
-    if [ "$1" -ne 1 ] && [ "$1" -ne 2 ] && [ "$1" -ne 3 ] ; then
+    if [ "$1" -ne $DEBUG ] && [ "$1" -ne $INFO ] && [ "$1" -ne $ERROR ] ; then
         error
         exit 1
     fi
     sed -i "s/\(log_level=\).*/\1$1/" "$config_file"
     exit 0
+}
+schedule() {
+    crontab -e >&3\
+    || { echo_console "\nCrontab not installed - try >>apt install crontab<<\nfor more check https://man7.org/linux/man-pages/man5/crontab.5.html"; exit 1; } 
 }
 logs() {
     cat $log_file >&3
@@ -154,19 +168,19 @@ folder_structure_check() {
         ((knt++))
     done
 }
-manual() {
-    check_conf_file
-    read_conf_file
-    if [ -z "$1" ]; then
-        log_message "$ERROR" "Path is missing, backup not created!"
-        exit 1
+conf_file_update() {
+    local int=$1
+    # Update date of last backup in configuration file, if data do not exist it will be created
+    if grep -q "^d$int=" "$config_file"; then
+        sed -i "s/^d$int=.*/d$int=$today/" "$config_file" \
+        && log_message "$DEBUG" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: date of backup updated in configuration file" \
+        || log_message "$ERROR" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: date of backup not updated in configuration file. Something goes wrong"
+    else
+        log_message "$DEBUG" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: d$int do not exist in configuration file"
+        echo "d$int=$today" >> "$config_file" \
+        && log_message "$DEBUG" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: d$int=$today added to configuration file" \
+        || log_message "$ERROR" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: d$int=$today not added to configuration file Something goes wrong"
     fi
-    log_message "$INFO" "Manual backup was called to $1"
-    
-    destination=$1"/"$now
-    check_folder_existance $destination
-    backup $destination
-    config_backup $destination
 }
 check_folder_existance() {
     local destination=$1
@@ -185,6 +199,20 @@ old_folder_purge() {
 	    log_message "$DEBUG" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: $destn/${period}d folder already empty"
 	fi
 }
+manual() {
+    check_conf_file
+    read_conf_file
+    if [ -z "$1" ]; then
+        log_message "$ERROR" "Path is missing, backup not created!"
+        exit 1
+    fi
+    log_message "$INFO" "Manual backup was called to $1"
+    
+    destination=$1"/"$now
+    check_folder_existance $destination
+    backup $destination
+    config_backup $destination
+}
 periodical() {
     check_conf_file
     read_conf_file
@@ -200,7 +228,7 @@ periodical() {
 	        for destn in "${bckp_dest[@]}"; do
                 destination="${destn}/${period}d"
                 check_folder_existance $destination
-   		        old_folder_purge $destination
+                old_folder_purge $destination
                 backup
 		        ((knt++))
 	        done
@@ -217,39 +245,27 @@ periodical() {
         config_backup $destn
     done
 }
-conf_file_update() {
-    local int=$1
-    # Update date of last backup in configuration file, if data do not exist it will be created
-    if grep -q "^d$int=" "$config_file"; then
-        sed -i "s/^d$int=.*/d$int=$today/" "$config_file" \
-        && log_message "$DEBUG" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: date of backup updated in configuration file" \
-        || log_message "$ERROR" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: date of backup not updated in configuration file. Something goes wrong"
-    else
-        log_message "$DEBUG" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: d$int do not exist in configuration file"
-        echo "d$int=$today" >> "$config_file" \
-        && log_message "$DEBUG" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: d$int=$today added to configuration file" \
-        || log_message "$ERROR" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: d$int=$today not added to configuration file Something goes wrong"
-    fi
-}
+
+
 
 case $1 in
-manual) "$@";;
-periodical) "$@";;
-"-m") manual $2;;
-"-p") periodical;;
+"") welcome;;
 "-c") edit_conf;;
 "conf") edit_conf;;
+help) "$@";;
+"-h") help;;
 "-l") logs;;
 "logs") logs;;
 "-L") log_level_update $2;;
 "loglevel") log_level_update $2;;
-"") welcome;;
-"--help") help;;
-"-h") help;;
+manual) "$@";;
+"-m") manual $2;;
+periodical) "$@";;
+"-p") periodical;;
 path) $@;;
-help) "$@";;
+schedule) $@;;
+"-s") schedule;;
 *) error;;
 esac
 
-log_message "$INFO" "Logs are accesible here: $log_file"
-log_message "$INFO" "Script execution completed."
+log_message "$INFO" "Logs are accesible here: $log_file\nScript execution completed."
