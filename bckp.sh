@@ -1,27 +1,27 @@
 #!/bin/bash
 
-config_file="$(dirname "$0")/bckp_conf.txt"
-log_file="/var/log/backpoi/bckp_logfile.log"
-self_path="$(dirname "$0")/$(basename "$0")"
+readonly config_file="$(dirname "$0")/bckp_conf.txt"
+readonly log_file="/var/log/backpoi/bckp_logfile.log"
+readonly self_path="$(dirname "$0")/$(basename "$0")"
 
 exec 3>&1                           # Redirect desired logs only to console 
 exec > >(tee -a "$log_file") 2>&1   # Redirect both stdout and stderr to the log file
 source "$config_file"               # Read configuration file 
 
 # Declare some variables
-log_level=1
+log_level=1 # Ddefault value, override by configuration file
+# Define log levels
+readonly ERROR=1
+readonly INFO=2
+readonly DEBUG=3
 
-
-today=$(date +%s)
-now=$(date +%Y-%m-%d_%H-%M-%S)
+readonly today=$(date +%s)
+readonly now=$(date +%Y-%m-%d_%H-%M-%S)
 int=1
 jnt=1
 knt=1
 
-# Define log levels
-ERROR=1
-INFO=2
-DEBUG=3
+
 
 log_message() {
     local level=$1
@@ -41,11 +41,12 @@ echo_console() {
 help() {
     echo_console "" && echo_console "Usage:\tbackpoi COMMAND [Parameter]"&& echo_console ""
     echo_console "Commands:"
-    echo_console "-m, manual\t\tStart manual backup to folder choosen in configuration file. Required parameter is path for backup"
-    echo_console "-l, logs\t\tPrint logfile from location $log_file"
     echo_console "-c, conf\t\tOpen configuration file from location $config_file"
-    echo_console "-p, periodical\t\tStart periodical backup fully based on configuration file. No additional parameters needed"
+    echo_console "-l, logs\t\tPrint logfile from location $log_file"
     echo_console "-L, loglevel\t\tIf kept without parameter read logging level. Allowed parameters: '1' or ERROR, '2' or INFO and '3' for DEBUG"
+    echo_console "-m, manual\t\tStart manual backup to folder choosen in configuration file. Required parameter is path for backup"
+    echo_console "-p, periodical\t\tStart periodical backup fully based on configuration file. No additional parameters needed"
+    echo_console "    path\t\tPrint path of script"
     echo_console "" && echo_console "Example:"
     echo_console "\tbackpoi -m /mnt/device_1/backup_folder"
     echo_console "This will create new folder in choosen directory using today's date as name and then copy all files and folders indicated in configuration file there"
@@ -54,12 +55,14 @@ help() {
     exit 0
 }
 welcome() {
-    echo_console ""&& echo_console ""&& echo_console "Welcome to BackPOI - easy and simple backup script for bash console"
-    echo_console ""&& echo_console ""&& echo_console "Script path is $self_path"
+    echo_console "/n/nWelcome to BackPOI - easy and simple backup script for bash console/n/n/nScript path is $self_path"
     help
 }
+path() {
+    echo_console ""&& echo_console ""&& echo_console "Script path is $self_path"
+}
 error() {
-    echo_console ""&& echo_console "Wrong syntax!"&& echo_console ""&& echo_console "Run 'backpoi --help' for more information"
+    echo_console "/nWrong syntax!/nRun 'backpoi --help' for more information"
     exit 1
 }
 edit_conf() {
@@ -142,6 +145,7 @@ folder_structure_check() {
                 mkdir -p "$destination" &&  log_message "$INFO"  "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: $destination folder created"\
                 || log_message "$ERROR" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: $destination folder creation failed"
                 backup
+                conf_file_update $int
             else
                 log_message "$DEBUG" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: $destination folder exist"
             fi
@@ -165,11 +169,21 @@ manual() {
     config_backup $destination
 }
 check_folder_existance() {
-    local $destination=$1
+    local destination=$1
     if ! [ -e "$destination" ]; then
         log_message "$DEBUG" "$destination folder doesn't exist"
         mkdir -p "$destination" &&  log_message "$INFO"  "$destination folder created"
     fi
+}
+old_folder_purge() {
+    # Purge old backup if exist
+    local destination=$1
+    if ! [ -z "$(ls -A "$destination")" ]; then
+	    rm -R -f "$destination"/* && log_message "$DEBUG" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: folder purged" \
+        || log_message "$ERROR" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: folder cannot be purged"
+	else
+	    log_message "$DEBUG" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: $destn/${period}d folder already empty"
+	fi
 }
 periodical() {
     check_conf_file
@@ -186,13 +200,7 @@ periodical() {
 	        for destn in "${bckp_dest[@]}"; do
                 destination="${destn}/${period}d"
                 check_folder_existance $destination
-   		        # Purge old backup if exist
-    	        if [ -z "$(ls -A "$destination")" ]; then
-	        	    rm -R "$destination"/* && log_message "$DEBUG" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: folder purged" \
-                    || log_message "$ERROR" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: folder cannot be purged"
-	            else
-		        log_message "$DEBUG" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: $destn/${period}d folder already empty"
-	            fi
+   		        old_folder_purge $destination
                 backup
 		        ((knt++))
 	        done
@@ -238,6 +246,7 @@ periodical) "$@";;
 "") welcome;;
 "--help") help;;
 "-h") help;;
+path) $@;;
 help) "$@";;
 *) error;;
 esac
