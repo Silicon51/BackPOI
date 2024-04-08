@@ -9,8 +9,8 @@ exec > >(tee -a "$log_file") 2>&1   # Redirect both stdout and stderr to the log
 source "$config_file"               # Read configuration file 
 
 # Declare some variables
-log_level=1 # Ddefault value, override by configuration file
-# Define log levels
+log_level=1 # Default value, override by configuration file
+# Defined log levels
 readonly ERROR=1
 readonly INFO=2
 readonly DEBUG=3
@@ -21,6 +21,7 @@ int=1
 jnt=1
 knt=1
 date_period=date$int
+progress=""
 
 
 log_message() {
@@ -96,10 +97,13 @@ log_level_update() {
     exit 0
 }
 schedule() {
+    # Open crontab
     crontab -e >&3\
     || { echo_console "\nCrontab not installed - try >>apt install crontab<<\nfor more check https://man7.org/linux/man-pages/man5/crontab.5.html"; exit 1; } 
 }
 logs() {
+    # Open log file
+    check_conf_file
     cat $log_file >&3
     exit 0
 }
@@ -109,31 +113,19 @@ source_progress() {
 }
 backup() {
     local destination=$1
-    destination_preriods_progress $knt $int
+    local jnt=1
     # Copy all files to choosen directory
-    jnt=1
-
-    if ! [ -z "$2" ]; then # If an argument to function was given then it's run by manual backup
-        #for filee in "${bckp_fls[@]}"; do
-        #    source_progress $jnt
-	    #    log_message "$INFO"  "copying files from $filee to $destination $src_progress"
-	    #    cp -R "$filee" "$destination/"\
-	    #    && log_message "$DEBUG"  "files from $filee copied to $destination $src_progress"\
-	    #    || log_message "$ERROR"  "failed to copy all files from $filee to $destination $src_progress"
-        #   ((jnt++))
-	    #done
-        progress=""
+    if [ -z "$2" ]; then # If run by manual backup procedure then progress field is blank
+        destination_preriods_progress $knt $int
     fi
-    #else # If there is no argument to function then it's run by period backup
-        for filee in "${bckp_fls[@]}"; do
-            source_progress $jnt
-            log_message "$INFO"  "${progress}copying files from $filee to $destination $src_progress"
-	        cp -R "$filee" "$destination/"\
-	        && log_message "$DEBUG" "${progress}files from $filee copied to $destination $src_progress"\
-	        || log_message "$ERROR" "${progress}failed to copy all files from $filee to $destination $src_progress"
-            ((jnt++))
-	    done
-    #fi
+    for filee in "${bckp_fls[@]}"; do
+        source_progress $jnt
+        log_message "$INFO" "${progress}copying files from $filee to $destination $src_progress"
+	    cp -R "$filee" "$destination/"\
+        && log_message "$DEBUG" "${progress}files from $filee copied to $destination $src_progress"\
+        || log_message "$ERROR" "${progress}failed to copy all files from $filee to $destination $src_progress"
+        ((jnt++))
+	done
 }
 config_backup() {
     cp  "$config_file" "$self_path" "$1" \
@@ -169,7 +161,6 @@ folder_structure_check() {
     local period=$1
     local subperiods=(A B)
     local subperiod=C
-    
     for destn in "${bckp_dest[@]}"; do
         destination_preriods_progress $knt $int
         log_message "$INFO"  "${progress}Checking if all destination folders from config files exist"
@@ -205,22 +196,29 @@ conf_file_update() {
         || log_message "$ERROR" "${progress}$date_period=$today not added to configuration file Something goes wrong"
     fi
     
-    # Update date of last backup in configuration file, if data do not exist it will be created
+    # Update which subdirectory was used this time
     log_message "$DEBUG" "${progress}Current subperiod for $date_period was $subperiod"
     if [ "$subperiod" == "A" ]; then
         subperiod=B
     else
         subperiod=A
     fi
+    if grep -q "^subperiod_$int=" "$config_file"; then
         sed -i "s/^subperiod_$int=.*/subperiod_$int=$subperiod/" "$config_file" \
         && log_message "$DEBUG" "${progress}New subperiod will be $subperiod" \
         || log_message "$ERROR" "${progress}Subperiod not updated in configuration file. Something goes wrong"
+    else
+        log_message "$DEBUG" "${progress}subperiod_$int do not exist in configuration file"
+        echo "subperiod_$int=$subperiod" >> "$config_file" \
+        && log_message "$DEBUG" "${progress}subperiod_$int=$subperiod added to configuration file" \
+        || log_message "$ERROR" "${progress}subperiod_$int=$subperiod not added to configuration file Something goes wrong"
+    fi
 }
 check_folder_existance() {
     local destination=$1
     if ! [ -e "$destination" ]; then
-        log_message "$DEBUG" "$destination folder doesn't exist"
-        mkdir -p "$destination" &&  log_message "$INFO"  "$destination folder created"
+        log_message "$DEBUG" "${progress}$destination folder doesn't exist"
+        mkdir -p "$destination" &&  log_message "$INFO" "${progress}$destination folder created"
     fi
 }
 old_folder_purge() {
@@ -279,7 +277,7 @@ periodical() {
             knt=1
             conf_file_update $int $subperiod
         else
-        log_message "$INFO"  "${progress}newer than assign period, nothing to be done"
+            log_message "$INFO" "${progress}newer than assign period, nothing to be done"
         fi
         folder_structure_check $period
 	    ((int++))
