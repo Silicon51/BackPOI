@@ -20,7 +20,7 @@ readonly now=$(date +%Y-%m-%d_%H-%M-%S)
 int=1
 jnt=1
 knt=1
-
+date_period=date$int
 
 
 log_message() {
@@ -104,10 +104,11 @@ logs() {
     exit 0
 }
 backup() {
+    local destination=$1
+    destination_preriods_progress $knt $int
     # Copy all files to choosen directory
     jnt=1
-    if ! [ -z "$1" ]; then # If an argument to function was given then it's run by manual backup
-        local destination=$1
+    if ! [ -z "$2" ]; then # If an argument to function was given then it's run by manual backup
         for filee in "${bckp_fls[@]}"; do
 	        log_message "$INFO"  "copying files from $filee to $destination [${jnt}/${bck_fls_count}]"
 	        cp -R "$filee" "$destination/"\
@@ -117,10 +118,10 @@ backup() {
 	    done
     else # If there is no argument to function then it's run by period backup
         for filee in "${bckp_fls[@]}"; do
-            log_message "$INFO"  "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: copying files from $filee to $destination [${jnt}/${bck_fls_count}]"
+            log_message "$INFO"  "$progress: copying files from $filee to $destination [${jnt}/${bck_fls_count}]"
 	        cp -R "$filee" "$destination/"\
-	        && log_message "$DEBUG" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: files from $filee copied to $destination [${jnt}/${bck_fls_count}]"\
-	        || log_message "$ERROR" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: failed to copy all files from $filee to $destination [${jnt}/${bck_fls_count}]"
+	        && log_message "$DEBUG" "$progress: files from $filee copied to $destination [${jnt}/${bck_fls_count}]"\
+	        || log_message "$ERROR" "$progress: failed to copy all files from $filee to $destination [${jnt}/${bck_fls_count}]"
             ((jnt++))
 	    done
     fi
@@ -145,42 +146,66 @@ read_conf_file() {
     bck_periods_count="${#backup_periods[@]}"
     bck_fls_count="${#bckp_fls[@]}" && log_message "$DEBUG" "Number of folders/files to backup: $bck_fls_count"
     bck_dest_count="${#bckp_dest[@]}"
+    #next_subperiod=$(grep -oP 'next_subperiod=\K.*' "$config_file")
+    subperiods=($(grep -oP 'subperiod_\d+=\K[A-Za-z]+' "$config_file"))
+}
+destination_preriods_progress() {
+    local knt=$1
+    local int=$2
+    progress="[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]"
 }
 folder_structure_check() {
     # Check for folder structure and if not exist create it. Then create backup in new folder structure
-    log_message "$INFO"  "Checking if all destination folders from config files exist"
-    knt=1
+    local knt=1
+    local period=$1
+    local subperiods=(A B)
+    local subperiod=C
+    
     for destn in "${bckp_dest[@]}"; do
-        int=1
-        for period in "${backup_periods[@]}"; do
-            destination="${destn}/${period}d"
+        destination_preriods_progress $knt $int
+        log_message "$INFO"  "$progress: Checking if all destination folders from config files exist"
+        for subperiod in "${subperiods[@]}"; do
+            destination_assigment $destn $period $subperiod
             if ! [ -e "$destination" ]; then
-                log_message "$DEBUG" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: $destination folder doesn't exist"
-                mkdir -p "$destination" &&  log_message "$INFO"  "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: $destination folder created"\
-                || log_message "$ERROR" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: $destination folder creation failed"
-                backup
-                conf_file_update $int
+                log_message "$DEBUG" "$progress: $destination folder doesn't exist"
+                mkdir -p "$destination" &&  log_message "$INFO"  "$progress: $destination folder created"\
+                || log_message "$ERROR" "$progress: $destination folder creation failed"
+                backup $destination 
+                conf_file_update $int $subperiod
             else
-                log_message "$DEBUG" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: $destination folder exist"
+                log_message "$DEBUG" "$progress: $destination folder exist"
             fi
-            ((int++))
         done
         ((knt++))
     done
 }
 conf_file_update() {
     local int=$1
+    local subperiod=$2
+    local date_period=date$int
+    destination_preriods_progress $knt $int
     # Update date of last backup in configuration file, if data do not exist it will be created
-    if grep -q "^d$int=" "$config_file"; then
-        sed -i "s/^d$int=.*/d$int=$today/" "$config_file" \
-        && log_message "$DEBUG" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: date of backup updated in configuration file" \
-        || log_message "$ERROR" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: date of backup not updated in configuration file. Something goes wrong"
+    if grep -q "^$date_period=" "$config_file"; then
+        sed -i "s/^$date_period=.*/date$int=$today/" "$config_file" \
+        && log_message "$DEBUG" "$progress: date of backup updated in configuration file" \
+        || log_message "$ERROR" "$progress: date of backup not updated in configuration file. Something goes wrong"
     else
-        log_message "$DEBUG" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: d$int do not exist in configuration file"
-        echo "d$int=$today" >> "$config_file" \
-        && log_message "$DEBUG" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: d$int=$today added to configuration file" \
-        || log_message "$ERROR" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: d$int=$today not added to configuration file Something goes wrong"
+        log_message "$DEBUG" "$progress: $date_period do not exist in configuration file"
+        echo "$date_period=$today" >> "$config_file" \
+        && log_message "$DEBUG" "$progress: $date_period=$today added to configuration file" \
+        || log_message "$ERROR" "$progress: $date_period=$today not added to configuration file Something goes wrong"
     fi
+    
+    # Update date of last backup in configuration file, if data do not exist it will be created
+    log_message "$DEBUG" "Current subperiod for $date_period was $subperiod"
+    if [ "$subperiod" == "A" ]; then
+        subperiod=B
+    else
+        subperiod=A
+    fi
+        sed -i "s/^subperiod_$int=.*/subperiod_$int=$subperiod/" "$config_file" \
+        && log_message "$DEBUG" "New subperiod will be $subperiod" \
+        || log_message "$ERROR" "Subperiod not updated in configuration file. Something goes wrong"
 }
 check_folder_existance() {
     local destination=$1
@@ -192,11 +217,12 @@ check_folder_existance() {
 old_folder_purge() {
     # Purge old backup if exist
     local destination=$1
+    destination_preriods_progress $knt $int
     if ! [ -z "$(ls -A "$destination")" ]; then
-	    rm -R -f "$destination"/* && log_message "$DEBUG" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: folder purged" \
-        || log_message "$ERROR" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: folder cannot be purged"
+	    rm -R -f "$destination"/* && log_message "$DEBUG" "$progress: folder purged" \
+        || log_message "$ERROR" "$progress: folder cannot be purged"
 	else
-	    log_message "$DEBUG" "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: $destn/${period}d folder already empty"
+	    log_message "$DEBUG" "$progress: $destn/${period}d folder already empty"
 	fi
 }
 manual() {
@@ -210,8 +236,14 @@ manual() {
     
     destination=$1"/"$now
     check_folder_existance $destination
-    backup $destination
+    backup $destination "manual"
     config_backup $destination
+}
+destination_assigment() {
+    local destn=$1
+    local period=$2
+    local subperiod=$3
+    destination="${destn}/${period}d/$subperiod"
 }
 periodical() {
     check_conf_file
@@ -220,26 +252,29 @@ periodical() {
     log_message "$DEBUG" "Number of periods of backup: $bck_periods_count"
     log_message "$DEBUG" "Number of destination backup paths: $bck_dest_count"
     for period in "${backup_periods[@]}"; do
-        days_passed=$(( (today - "d$int") / 86400 ))
-        log_message "$INFO"  "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: days passed since last backup: $days_passed"
+        destination_preriods_progress $knt $int
+        date_period=date$int
+        days_passed=$(( (today - date_period) / 86400 ))
+        subperiod=${subperiods[($int-1)]}
+        log_message "$INFO"  "$progress: days passed since last backup: $days_passed"
         # Check if days passed since last backup excide defined backup period
         if [ "$days_passed" -gt "$period" ]; then
-            log_message "$INFO"  "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: backup is older than configured period=${period}days"
+            log_message "$INFO"  "$progress: backup is older than configured period=${period}days"
 	        for destn in "${bckp_dest[@]}"; do
-                destination="${destn}/${period}d"
+                destination_assigment $destn $period $subperiod
                 check_folder_existance $destination
                 old_folder_purge $destination
-                backup
+                backup $destination
 		        ((knt++))
 	        done
             knt=1
-            conf_file_update $int
+            conf_file_update $int $subperiod
         else
-        log_message "$INFO"  "[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: newer than assign period, nothing to be done"
+        log_message "$INFO"  "$progress: newer than assign period, nothing to be done"
         fi
+        folder_structure_check $period
 	    ((int++))
     done
-    folder_structure_check
     # Script and config file backup
     for destn in "${bckp_dest[@]}"; do
         config_backup $destn

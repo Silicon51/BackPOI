@@ -24,7 +24,11 @@ log_level=3
 first_usage=true
 
 # date of last backup for each period if removed script will create all backup_periods
-d1=1712000000
-d2=1710000000
-d3=1700000000
-d4=1600000000
+subperiod_1=A
+subperiod_2=A
+subperiod_3=A
+subperiod_4=A
+date1=1712000000
+date2=1710000000
+date3=1700000000
+date4=1600000000
