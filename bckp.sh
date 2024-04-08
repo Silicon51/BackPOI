@@ -107,31 +107,6 @@ logs() {
     cat $log_file >&3
     exit 0
 }
-source_progress() {
-    local jnt=$1
-    src_progress="[${jnt}/${bck_fls_count}]"
-}
-backup() {
-    local destination=$1
-    local jnt=1
-    # Copy all files to choosen directory
-    if [ -z "$2" ]; then # If run by manual backup procedure then progress field is blank
-        destination_preriods_progress $knt $int
-    fi
-    for filee in "${bckp_fls[@]}"; do
-        source_progress $jnt
-        log_message "$INFO" "${progress}copying files from $filee to $destination $src_progress"
-	    cp -R "$filee" "$destination/"\
-        && log_message "$DEBUG" "${progress}files from $filee copied to $destination $src_progress"\
-        || log_message "$ERROR" "${progress}failed to copy all files from $filee to $destination $src_progress"
-        ((jnt++))
-	done
-}
-config_backup() {
-    cp  "$config_file" "$self_path" "$1" \
-    && log_message "$INFO"  "Script and config files copied to backup folder $1"\
-    || log_message "$ERROR" "Failed to copy script and config files to backup folder $1"
-}
 check_conf_file() {
     touch "$config_file" || { log_message "$ERROR" "Config file not found, backup not created!"; exit 1; }
     touch "$log_file" || { log_message "$ERROR" "Could not create log file"; exit 1; }
@@ -150,10 +125,12 @@ read_conf_file() {
     #next_subperiod=$(grep -oP 'next_subperiod=\K.*' "$config_file")
     subperiods=($(grep -oP 'subperiod_\d+=\K[A-Za-z]+' "$config_file"))
 }
-destination_preriods_progress() {
-    local knt=$1
-    local int=$2
-    progress="[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: "
+check_folder_existance() {
+    local destination=$1
+    if ! [ -e "$destination" ]; then
+        log_message "$DEBUG" "${progress}$destination folder doesn't exist"
+        mkdir -p "$destination" &&  log_message "$INFO" "${progress}$destination folder created"
+    fi
 }
 folder_structure_check() {
     # Check for folder structure and if not exist create it. Then create backup in new folder structure
@@ -214,13 +191,6 @@ conf_file_update() {
         || log_message "$ERROR" "${progress}subperiod_$int=$subperiod not added to configuration file Something goes wrong"
     fi
 }
-check_folder_existance() {
-    local destination=$1
-    if ! [ -e "$destination" ]; then
-        log_message "$DEBUG" "${progress}$destination folder doesn't exist"
-        mkdir -p "$destination" &&  log_message "$INFO" "${progress}$destination folder created"
-    fi
-}
 old_folder_purge() {
     # Purge old backup if exist
     local destination=$1
@@ -231,6 +201,42 @@ old_folder_purge() {
 	else
 	    log_message "$DEBUG" "${progress}$destn/${period}d folder already empty"
 	fi
+}
+source_progress() {
+    local jnt=$1
+    src_progress="[${jnt}/${bck_fls_count}]"
+}
+destination_preriods_progress() {
+    local knt=$1
+    local int=$2
+    progress="[${knt}/${bck_dest_count}] [${int}/${bck_periods_count}]: "
+}
+destination_assigment() {
+    local destn=$1
+    local period=$2
+    local subperiod=$3
+    destination="${destn}/${period}d/$subperiod"
+}
+config_backup() {
+    cp  "$config_file" "$self_path" "$1" \
+    && log_message "$INFO"  "Script and config files copied to backup folder $1"\
+    || log_message "$ERROR" "Failed to copy script and config files to backup folder $1"
+}
+backup() {
+    local destination=$1
+    local jnt=1
+    # Copy all files to choosen directory
+    if [ -z "$2" ]; then # If run by manual backup procedure then progress field is blank
+        destination_preriods_progress $knt $int
+    fi
+    for filee in "${bckp_fls[@]}"; do
+        source_progress $jnt
+        log_message "$INFO" "${progress}copying files from $filee to $destination $src_progress"
+	    cp -R "$filee" "$destination/"\
+        && log_message "$DEBUG" "${progress}files from $filee copied to $destination $src_progress"\
+        || log_message "$ERROR" "${progress}failed to copy all files from $filee to $destination $src_progress"
+        ((jnt++))
+	done
 }
 manual() {
     check_conf_file
@@ -245,12 +251,6 @@ manual() {
     check_folder_existance $destination
     backup $destination "manual"
     config_backup $destination
-}
-destination_assigment() {
-    local destn=$1
-    local period=$2
-    local subperiod=$3
-    destination="${destn}/${period}d/$subperiod"
 }
 periodical() {
     check_conf_file
@@ -287,7 +287,6 @@ periodical() {
         config_backup $destn
     done
 }
-
 
 
 case $1 in
