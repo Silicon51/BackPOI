@@ -9,7 +9,7 @@ exec > >(tee -a "$log_file") 2>&1   # Redirect both stdout and stderr to the log
 source "$config_file"               # Read configuration file 
 
 # Declare some variables
-log_level=1 # Default value, override by configuration file
+log_level=$INFO # Default value, override by configuration file
 # Defined log levels
 readonly ERROR=1
 readonly INFO=2
@@ -22,6 +22,55 @@ jnt=1
 knt=1
 date_period=date$int
 progress=""
+
+file_exists() {
+    local file=$1
+    [ -e "$file" ]
+}
+handle_command() {
+case $1 in
+"") welcome;;
+"-c") edit_conf;;
+"conf") edit_conf;;
+help) "$@";;
+"-h") help;;
+"-l") logs;;
+"logs") logs;;
+"-L") log_level_update $2;;
+"loglevel") log_level_update $2;;
+manual) "$@";;
+"-m") manual $2;;
+periodical) "$@";;
+"-p") periodical;;
+path) $@;;
+schedule) $@;;
+"-s") schedule;;
+*) error;;
+esac
+}
+
+load_config() {
+    file_exists "$CONFIG_FILE" || handle_error "Config file not found: $CONFIG_FILE"
+    source "$CONFIG_FILE" || handle_error "Failed to load configuration from: $CONFIG_FILE"
+    log_message $DEBUG "Configuration loaded successfully"
+}
+handle_error() {
+    local message=$1
+    log_message $ERROR "$message"
+    echo_console "$message"
+    exit 1
+}
+main() {
+    handle_command "$@"
+    progress=""
+    log_message "$INFO" "Logs are accesible here: $log_file"
+    log_message "$INFO" "Script execution completed."
+}
+
+
+
+
+
 
 
 log_message() {
@@ -219,7 +268,7 @@ destination_assigment() {
 }
 config_backup() {
     local progress=""
-    cp  "$config_file" "$self_path" "$1" \
+    cp  -u "$config_file" "$self_path" "$1" \
     && log_message "$INFO"  "Script and config files copied to backup folder $1"\
     || log_message "$ERROR" "Failed to copy script and config files to backup folder $1"
 }
@@ -233,14 +282,13 @@ backup() {
     for filee in "${bckp_fls[@]}"; do
         source_progress $jnt
         log_message "$INFO" "copying files from $filee to $destination $src_progress"
-	    cp -R "$filee" "$destination/"\
+	    cp -R -u -f "$filee" "$destination/"\
         && log_message "$DEBUG" "files from $filee copied to $destination $src_progress"\
         || log_message "$ERROR" "failed to copy all files from $filee to $destination $src_progress"
         ((jnt++))
 	done
 }
 manual() {
-    progress=""
     check_conf_file
     read_conf_file
     if [ -z "$1" ]; then
@@ -248,7 +296,6 @@ manual() {
         exit 1
     fi
     log_message "$INFO" "Manual backup was called to $1"
-    
     destination=$1"/"$now
     check_folder_existance $destination
     backup $destination "manual"
@@ -272,14 +319,14 @@ periodical() {
 	        for destn in "${bckp_dest[@]}"; do
                 destination_assigment $destn $period $subperiod
                 check_folder_existance $destination
-                old_folder_purge $destination
+                # old_folder_purge $destination
                 backup $destination
 		        ((knt++))
 	        done
             knt=1
             conf_file_update $int $subperiod
         else
-            log_message "$INFO" "newer than assign period, nothing to be done"
+            log_message "$INFO" "newer than assigned period, nothing to be done"
         fi
         folder_structure_check $period
 	    ((int++))
@@ -291,26 +338,4 @@ periodical() {
 }
 
 
-case $1 in
-"") welcome;;
-"-c") edit_conf;;
-"conf") edit_conf;;
-help) "$@";;
-"-h") help;;
-"-l") logs;;
-"logs") logs;;
-"-L") log_level_update $2;;
-"loglevel") log_level_update $2;;
-manual) "$@";;
-"-m") manual $2;;
-periodical) "$@";;
-"-p") periodical;;
-path) $@;;
-schedule) $@;;
-"-s") schedule;;
-*) error;;
-esac
-
-progress=""
-log_message "$INFO" "Logs are accesible here: $log_file"
-log_message "$INFO" "Script execution completed."
+main "$@"
