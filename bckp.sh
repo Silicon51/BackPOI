@@ -27,52 +27,35 @@ file_exists() {
     local file=$1
     [ -e "$file" ]
 }
+
 handle_command() {
-case $1 in
-"") welcome;;
-"-c") edit_conf;;
-"conf") edit_conf;;
-help) "$@";;
-"-h") help;;
-"-l") logs;;
-"logs") logs;;
-"-L") log_level_update $2;;
-"loglevel") log_level_update $2;;
-manual) "$@";;
-"-m") manual $2;;
-periodical) "$@";;
-"-p") periodical;;
-path) $@;;
-schedule) $@;;
-"-s") schedule;;
-*) error;;
-esac
+    case $1 in
+    "") welcome;;
+    "-c") edit_conf;;
+    "conf") edit_conf;;
+    help) "$@";;
+    "-h") help;;
+    "-l") logs;;
+    "logs") logs;;
+    "-L") log_level_update $2;;
+    "loglevel") log_level_update $2;;
+    manual) "$@";;
+    "-m") manual $2;;
+    periodical) "$@";;
+    "-p") periodical;;
+    path) $@;;
+    schedule) $@;;
+    "-s") schedule;;
+    *) error;;
+    esac
 }
 
-load_config() {
-    file_exists "$CONFIG_FILE" || handle_error "Config file not found: $CONFIG_FILE"
-    source "$CONFIG_FILE" || handle_error "Failed to load configuration from: $CONFIG_FILE"
-    log_message $DEBUG "Configuration loaded successfully"
-}
-handle_error() {
-    local message=$1
-    log_message $ERROR "$message"
-    echo_console "$message"
-    exit 1
-}
 main() {
     handle_command "$@"
     progress=""
     log_message "$INFO" "Logs are accesible here: $log_file"
     log_message "$INFO" "Script execution completed."
 }
-
-
-
-
-
-
-
 log_message() {
     local level=$1
     local message=$2
