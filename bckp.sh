@@ -27,7 +27,6 @@ file_exists() {
     local file=$1
     [ -e "$file" ]
 }
-
 handle_command() {
     case $1 in
     "") welcome;;
@@ -76,8 +75,9 @@ help() {
     echo_console "Commands:"
     echo_console "-c, conf\t\tOpen configuration file from location $config_file"
     echo_console "-l, logs\t\tPrint logfile from location $log_file"
-    echo_console "-L, loglevel\t\tIf kept without parameter read logging level. Allowed parameters: '1' or ERROR, '2' or INFO and '3' for DEBUG"
-    echo_console "-m, manual\t\tStart manual backup to folder choosen in configuration file. Required parameter is path for backup"
+    echo_console "-L, loglevel\t\tIf kept without parameter read logging level. Allowed parameters: '1' ERROR, '2' INFO and '3' DEBUG"
+    echo_console "-m, manual\t\tStart manual backup to folder choosen in configuration file. Optional parameter is path for backup."
+    echo_console "\t\t\tIf missing then first destination from config file will be used"
     echo_console "-p, periodical\t\tStart periodical backup fully based on configuration file. No additional parameters needed"
     echo_console "    path\t\tPrint path of script"
     echo_console "-s, schedule\t\tOpen Crontab"
@@ -154,7 +154,6 @@ read_conf_file() {
     bck_periods_count="${#backup_periods[@]}"
     bck_fls_count="${#bckp_fls[@]}" && log_message "$DEBUG" "Number of folders/files to backup: $bck_fls_count"
     bck_dest_count="${#bckp_dest[@]}"
-    #next_subperiod=$(grep -oP 'next_subperiod=\K.*' "$config_file")
     subperiods=($(grep -oP 'subperiod_\d+=\K[A-Za-z]+' "$config_file"))
 }
 check_folder_existance() {
@@ -276,9 +275,8 @@ manual() {
     read_conf_file
     if [ -z "$1" ]; then
         destination=${bckp_dest[0]}"/"$now
-        log_message "$INFO" "Path is missing!"
-        log_message "$INFO" "Manual backup was called to first destination from config file: $destination"
-        #exit 1
+        log_message "$INFO" "Manual backup: Destination path is missing!"
+        log_message "$INFO" "Manual backup: Will be used first destination from config file: $destination"
     else 
         destination=$1"/"$now
         log_message "$INFO" "Manual backup was called to $destination"
