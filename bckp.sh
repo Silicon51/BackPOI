@@ -275,7 +275,7 @@ manual() {
     check_conf_file
     read_conf_file
     if [ -z "$1" ]; then
-        destination=${bckp_dest[1]}"/"$now
+        destination=${bckp_dest[0]}"/"$now
         log_message "$INFO" "Path is missing!"
         log_message "$INFO" "Manual backup was called to first destination from config file: $destination"
         #exit 1
