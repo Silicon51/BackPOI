@@ -275,11 +275,14 @@ manual() {
     check_conf_file
     read_conf_file
     if [ -z "$1" ]; then
-        log_message "$ERROR" "Path is missing, backup not created!"
-        exit 1
+        destination=${backup_periods[1]}"/"$now
+        log_message "$INFO" "Path is missing!"
+        log_message "$INFO" "Manual backup was called to first destination from config file: $destination"
+        #exit 1
+    else 
+        destination=$1"/"$now
+        log_message "$INFO" "Manual backup was called to $destination"
     fi
-    log_message "$INFO" "Manual backup was called to $1"
-    destination=$1"/"$now
     check_folder_existance $destination
     backup $destination "manual"
     config_backup $destination
