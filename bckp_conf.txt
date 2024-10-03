@@ -17,12 +17,17 @@ path2="/home/usr"
 dest1="/mnt/dvc1/backup"
 
 
+# !!!!!!!!!!!!!!!!!!!!!! 
+# This part is managed by script do not change it manually!!
+# !!!!!!!!!!!!!!!!!!!!!!
 
-# This part is managed by script do not change it manually
+
+
+
+
 
 log_level=3
 first_usage=true
-
 # date of last backup for each period if removed script will create all backup_periods
 subperiod_1=A
 subperiod_2=A
