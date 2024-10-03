@@ -4,7 +4,7 @@ Backpoi is easy and simple bash script with shell commands used for backup. Main
 
 MANUAL:
 0) FOR THE FIRST TIME YOU NEED TO RUN IT WITH ROOT PERMISIONS (AS SODO) TO ALLOW SCRIPT CREATE ALL NECESSARY FILES
-1) Both files should be in this same folder eg for ubuntu 22.04 (tested) strongly suggested is /usr/local/bin/ thanks to that it is possible to access to script by typing $backpoi instead of full path.
+1) Both files should be in this same folder eg for ubuntu 22 and 24 (both tested) strongly suggested is /usr/local/bin/ thanks to that it is possible to access to script by typing $backpoi instead of full path.
 Another option is to link files from your folder by executing `ln -s /path/to/backpoi /usr/local/bin`
 2) Script allows for 2 types o backup:
   * manual - requires parameter of destination path and there create new folder for backup (name is date_time of script)
