@@ -49,17 +49,8 @@ handle_command() {
     esac
 }
 
-check_if_run_as_root() {
-    if [[ $EUID -ne 0 ]]; then
-        log_message "$ERROR" "This script must be run as root" 
-        exit 1
-    else
-        log_message "$INFO" "Root access granted" 
-    fi
-}
 
 main() {
-    #check_if_run_as_root
     handle_command "$@"
     progress=""
     log_message "$INFO" "Logs are accesible here: $log_file"
@@ -151,9 +142,7 @@ logs() {
 }
 check_conf_file() {
     touch "$config_file" || { log_message "$ERROR" "Config file not found, backup not created!"; exit 1; }
-    #chmod 666 "$config_file"
     touch "$log_file" || { log_message "$ERROR" "Could not create log file"; exit 1; }
-    #chmod 666 "$log_file"
     log_level=$(grep -oP 'log_level=\K.*' "$config_file") 
 }
 read_conf_file() {
